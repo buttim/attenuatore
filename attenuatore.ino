@@ -1,13 +1,24 @@
-#include <MD_KeySwitch.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Fonts/FreeSansBold18pt7b.h>
+#include <MD_KeySwitch.h>
 
-const int BTN_MENO=4, BTN_PIU=3, V1=5, V2=6,V3=7, V4=8, V5=9, V6=10;
+#define USE_ENCODER
+
+#ifdef USE_ENCODER
+#include <Encoder.h>
+const int ENC_A=3,ENC_B=2,BUTTON=11;
+MD_KeySwitch button(BUTTON,LOW);
+Encoder encoder(3,2);
+#else
+const int BTN_MENO=4, BTN_PIU=3;
+MD_KeySwitch meno(BTN_MENO, LOW), piu(BTN_PIU, LOW);
+#endif
+
+const int V1=5, V2=6,V3=7, V4=8, V5=9, V6=10;
 
 int val=0, oldVal=64;
 Adafruit_SSD1306 disp;
-MD_KeySwitch meno(BTN_MENO, LOW), piu(BTN_PIU, LOW);
 
 void updateDisplay(uint8_t val) {
   char s[10];
@@ -40,6 +51,12 @@ void setup() {
   disp.setTextSize(1);
   disp.setTextColor(WHITE);
 
+#ifdef USE_ENCODER
+  pinMode(BUTTON,INPUT_PULLUP);
+#else
+  pinMode(MENO,INPUT_PULLUP);
+  pinMode(PIU,INPUT_PULLUP);
+
   meno.begin();
   meno.enableRepeat(true);
   meno.enableDoublePress(true);
@@ -47,7 +64,7 @@ void setup() {
   piu.begin();
   piu.enableRepeat(true);
   piu.enableDoublePress(true);
-
+#endif
   pinMode(V1,OUTPUT);
   pinMode(V2,OUTPUT);
   pinMode(V3,OUTPUT);
@@ -57,6 +74,11 @@ void setup() {
 }
 
 void loop() {
+#ifdef USE_ENCODER
+  int t=constrain(encoder.read(),0,255);
+  val=constrain(t/4,0,63); //sadly necessary
+  encoder.write(t);
+#else
   switch (meno.read()) {
     case MD_KeySwitch::KS_PRESS:
     case MD_KeySwitch::KS_RPTPRESS:
@@ -78,9 +100,18 @@ void loop() {
   }
 
   val=constrain(val,0,63);
+#endif
+
+  switch (button.read()) {
+    case MD_KeySwitch::KS_PRESS:
+      val=val<32?63:0;
+      encoder.write(val*4);
+      break;
+  }
+
   if (val!=oldVal) {
-    oldVal=val;
     Serial.println(val);
+    oldVal=val;
     updateDisplay(val);
     updatePins(val);
   }
