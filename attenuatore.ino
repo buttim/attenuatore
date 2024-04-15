@@ -21,6 +21,30 @@ const int V1 = 5, V2 = 6, V3 = 7, V4 = 8, V5 = 9, V6 = 10;
 int val = 0, oldVal = 64;
 Adafruit_SSD1306 disp;
 
+long readVcc() {
+  // Read 1.1V reference against AVcc
+  // set the reference to Vcc and the measurement to the internal 1.1V reference
+  #if defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+    ADMUX = _BV(REFS0) | _BV(MUX4) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  #elif defined (__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__)
+     ADMUX = _BV(MUX5) | _BV(MUX0) ;
+  #else
+    ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  #endif  
+ 
+  delay(2); // Wait for Vref to settle
+  ADCSRA |= _BV(ADSC); // Start conversion
+  while (bit_is_set(ADCSRA,ADSC)); // measuring
+ 
+  uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH  
+  uint8_t high = ADCH; // unlocks bothstop
+ 
+  long result = (high<<8) | low;
+ 
+  result = 1125300L / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
+  return result; // Vcc in millivolts
+}
+
 void updateDisplay(uint8_t val) {
   char s[10];
   int16_t x1, y1;
@@ -46,7 +70,14 @@ void updatePins(uint8_t val) {
   digitalWrite(V6, val & 0x20 ? HIGH : LOW);
 }
 
-void setup() {
+void checkBattery() {
+  if (readVcc()<3000)
+    while(true)
+      LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
+}
+
+void setup() { 
+  checkBattery();
   Serial.begin(115200);
 
   disp.begin();
@@ -79,7 +110,12 @@ void setup() {
   pinMode(V6, OUTPUT);
 }
 
+uint64_t tLast=0;
 void loop() {
+  if (tLast==0 || millis()-tLast>5000) {
+    tLast=millis();
+    checkBattery();
+  }
 #ifdef USE_ENCODER
   int t = constrain(encoder.read(), 0, 255);
   val = constrain(t / 4, 0, 63);  //sadly necessary
@@ -128,6 +164,7 @@ void loop() {
       disp.clearDisplay();
       disp.display();
       LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
+      checkBattery();
       detachInterrupt(digitalPinToInterrupt(BUTTON));
       disp.ssd1306_command(SSD1306_DISPLAYON);
       updateDisplay(0);
