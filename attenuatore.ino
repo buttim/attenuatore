@@ -1,6 +1,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Fonts/FreeSansBold18pt7b.h>
+#include <Fonts/FreeSansBold12pt7b.h>
 #include <MD_KeySwitch.h>
 #include <LowPower.h>
 
@@ -21,7 +22,10 @@ const int V1 = 5, V2 = 6, V3 = 7, V4 = 8, V5 = 9, V6 = 10;
 int val = 0, oldVal = 64;
 Adafruit_SSD1306 disp;
 
-long readVcc() {
+//From https://provideyourown.com/2012/secret-arduino-voltmeter-measure-battery-voltage/
+//Secret Arduino Voltmeter – Measure Battery Voltage by Provide Your Own is licensed 
+//under a Creative Commons Attribution-ShareAlike 4.0 International License.
+int readVcc() {
   // Read 1.1V reference against AVcc
   // set the reference to Vcc and the measurement to the internal 1.1V reference
   #if defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
@@ -41,8 +45,8 @@ long readVcc() {
  
   long result = (high<<8) | low;
  
-  result = 1125300L / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
-  return result; // Vcc in millivolts
+  result = 1387069L / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
+  return (int)result; // Vcc in millivolts
 }
 
 void updateDisplay(uint8_t val) {
@@ -54,11 +58,28 @@ void updateDisplay(uint8_t val) {
     dtostrf(val / 2.0, 3, 1, s);
   else
     strcpy(s, "OFF");
+  disp.setFont(&FreeSansBold18pt7b);
   disp.getTextBounds(s, 0, 0, &x1, &y1, &w, &h);
   disp.clearDisplay();
   disp.setCursor((128 - w) / 2, 28);
   disp.print(s);
   disp.display();
+}
+
+void showVcc(int vcc) {
+  char s[10];
+  int16_t x1, y1;
+  uint16_t w, h;
+
+  itoa(vcc,s,10);
+  strcat(s,"mV");
+  disp.setFont(&FreeSansBold12pt7b);
+  disp.getTextBounds(s, 0, 0, &x1, &y1, &w, &h);
+  disp.clearDisplay();
+  disp.setCursor((128 - w) / 2, 28);
+  disp.print(s);
+  disp.display();
+  delay(1000);
 }
 
 void updatePins(uint8_t val) {
@@ -81,10 +102,13 @@ void setup() {
   Serial.begin(115200);
 
   disp.begin();
+  disp.setRotation(2);
   disp.clearDisplay();
   disp.setFont(&FreeSansBold18pt7b);
   disp.setTextSize(1);
   disp.setTextColor(WHITE);
+
+  showVcc(readVcc());
 
 #ifdef USE_ENCODER
   pinMode(BUTTON, INPUT_PULLUP);
@@ -152,7 +176,6 @@ void loop() {
     case MD_KeySwitch::KS_LONGPRESS:
       updateDisplay(255);
       val = 0;
-      disp.ssd1306_command(SSD1306_DISPLAYOFF);
       while (digitalRead(BUTTON) == LOW)
         ;
       updatePins(0);
@@ -160,13 +183,15 @@ void loop() {
         digitalPinToInterrupt(BUTTON), []() {}, LOW);
       delay(300);
       disp.dim(true);
-      delay(300);
+      delay(600);
       disp.clearDisplay();
       disp.display();
+      disp.ssd1306_command(SSD1306_DISPLAYOFF);
       LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
       checkBattery();
       detachInterrupt(digitalPinToInterrupt(BUTTON));
       disp.ssd1306_command(SSD1306_DISPLAYON);
+      showVcc(readVcc());
       updateDisplay(0);
       delay(300);
       disp.dim(false);
