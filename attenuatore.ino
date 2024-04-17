@@ -5,6 +5,8 @@
 #include <MD_KeySwitch.h>
 #include <LowPower.h>
 
+//FUSES: L=E2 H=DA E=0E
+
 #define USE_ENCODER
 
 #ifdef USE_ENCODER
@@ -21,6 +23,7 @@ const int V1 = 5, V2 = 6, V3 = 7, V4 = 8, V5 = 9, V6 = 10;
 
 int val = 0, oldVal = 64;
 Adafruit_SSD1306 disp;
+uint64_t tLastCheck=0, tLastInput=0;
 
 //From https://provideyourown.com/2012/secret-arduino-voltmeter-measure-battery-voltage/
 //Secret Arduino Voltmeter – Measure Battery Voltage by Provide Your Own is licensed 
@@ -97,17 +100,47 @@ void checkBattery() {
       LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
 }
 
-void setup() { 
+void powerOff() {
+  updateDisplay(255);
+  val = 0;
+  while (digitalRead(BUTTON) == LOW)
+    ;
+  updatePins(0);
+  attachInterrupt(
+    digitalPinToInterrupt(BUTTON), []() {}, LOW);
+  delay(300);
+  disp.dim(true);
+  delay(600);
+  disp.clearDisplay();
+  disp.display();
+  disp.ssd1306_command(SSD1306_DISPLAYOFF);
+  LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
   checkBattery();
-  Serial.begin(115200);
+  detachInterrupt(digitalPinToInterrupt(BUTTON));
+  tLastInput=0;
+  initDisplay();
+  showVcc(readVcc());
+  updateDisplay(0);
+  delay(300);
+  disp.dim(false);
+  while (digitalRead(BUTTON) == LOW)
+    ;
+}
 
+void initDisplay() {
   disp.begin();
   disp.setRotation(2);
   disp.clearDisplay();
   disp.setFont(&FreeSansBold18pt7b);
   disp.setTextSize(1);
   disp.setTextColor(WHITE);
+}
 
+void setup() {
+  checkBattery();
+  Serial.begin(115200);
+
+  initDisplay();
   showVcc(readVcc());
 
 #ifdef USE_ENCODER
@@ -134,12 +167,13 @@ void setup() {
   pinMode(V6, OUTPUT);
 }
 
-uint64_t tLast=0;
 void loop() {
-  if (tLast==0 || millis()-tLast>5000) {
-    tLast=millis();
+  if (tLastCheck==0 || millis()-tLastCheck>5000) {
+    tLastCheck=millis();
     checkBattery();
   }
+  if (tLastInput!=0 && millis()-tLastInput>10*60*1000UL)
+    powerOff();
 #ifdef USE_ENCODER
   int t = constrain(encoder.read(), 0, 255);
   val = constrain(t / 4, 0, 63);  //sadly necessary
@@ -174,33 +208,12 @@ void loop() {
       encoder.write(val * 4);
       break;
     case MD_KeySwitch::KS_LONGPRESS:
-      updateDisplay(255);
-      val = 0;
-      while (digitalRead(BUTTON) == LOW)
-        ;
-      updatePins(0);
-      attachInterrupt(
-        digitalPinToInterrupt(BUTTON), []() {}, LOW);
-      delay(300);
-      disp.dim(true);
-      delay(600);
-      disp.clearDisplay();
-      disp.display();
-      disp.ssd1306_command(SSD1306_DISPLAYOFF);
-      LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
-      checkBattery();
-      detachInterrupt(digitalPinToInterrupt(BUTTON));
-      disp.ssd1306_command(SSD1306_DISPLAYON);
-      showVcc(readVcc());
-      updateDisplay(0);
-      delay(300);
-      disp.dim(false);
-      while (digitalRead(BUTTON) == LOW)
-        ;
+      powerOff();
       break;
   }
 
   if (val != oldVal) {
+    tLastInput=millis();
     Serial.println(val);
     oldVal = val;
     updateDisplay(val);
