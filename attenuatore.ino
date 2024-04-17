@@ -52,21 +52,27 @@ int readVcc() {
   return (int)result; // Vcc in millivolts
 }
 
-void updateDisplay(uint8_t val) {
-  char s[10];
+void show(const char *s,const GFXfont *f=&FreeSansBold18pt7b) {
   int16_t x1, y1;
   uint16_t w, h;
 
-  if (val < 255)
-    dtostrf(val / 2.0, 3, 1, s);
-  else
-    strcpy(s, "OFF");
-  disp.setFont(&FreeSansBold18pt7b);
+  disp.setFont(f);
   disp.getTextBounds(s, 0, 0, &x1, &y1, &w, &h);
   disp.clearDisplay();
   disp.setCursor((128 - w) / 2, 28);
   disp.print(s);
   disp.display();
+}
+
+void updateDisplay(uint8_t val) {
+  char s[10];
+
+  dtostrf(val / 2.0, 3, 1, s);
+  show(s);
+}
+
+void showOff() {
+  show("OFF");
 }
 
 void showVcc(int vcc) {
@@ -76,12 +82,7 @@ void showVcc(int vcc) {
 
   itoa(vcc,s,10);
   strcat(s,"mV");
-  disp.setFont(&FreeSansBold12pt7b);
-  disp.getTextBounds(s, 0, 0, &x1, &y1, &w, &h);
-  disp.clearDisplay();
-  disp.setCursor((128 - w) / 2, 28);
-  disp.print(s);
-  disp.display();
+  show(s,&FreeSansBold12pt7b);
   delay(1000);
 }
 
@@ -95,19 +96,17 @@ void updatePins(uint8_t val) {
 }
 
 void checkBattery() {
-  if (readVcc()<3000)
+  if (readVcc()<2600)
     while(true)
       LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
 }
 
 void powerOff() {
-  updateDisplay(255);
+  showOff();
   val = 0;
   while (digitalRead(BUTTON) == LOW)
     ;
   updatePins(0);
-  attachInterrupt(
-    digitalPinToInterrupt(BUTTON), []() {}, LOW);
   delay(300);
   disp.dim(true);
   delay(600);
@@ -116,7 +115,6 @@ void powerOff() {
   disp.ssd1306_command(SSD1306_DISPLAYOFF);
   LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
   checkBattery();
-  detachInterrupt(digitalPinToInterrupt(BUTTON));
   tLastInput=0;
   initDisplay();
   showVcc(readVcc());
