@@ -103,22 +103,22 @@ void checkBattery() {
 
 void powerOff() {
   showOff();
-  val = 0;
   while (digitalRead(BUTTON) == LOW)
     ;
-  updatePins(0);
   delay(300);
   disp.dim(true);
   delay(600);
   disp.clearDisplay();
   disp.display();
   disp.ssd1306_command(SSD1306_DISPLAYOFF);
+  attachInterrupt(digitalPinToInterrupt(BUTTON), []() {}, LOW);
   LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
+  detachInterrupt(digitalPinToInterrupt(BUTTON));
   checkBattery();
   tLastInput=0;
   initDisplay();
   showVcc(readVcc());
-  updateDisplay(0);
+  updateDisplay(val);
   delay(300);
   disp.dim(false);
   while (digitalRead(BUTTON) == LOW)
