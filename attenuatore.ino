@@ -136,6 +136,12 @@ void setup() {
   pinMode(BUTTON, INPUT_PULLUP);
   button.enableRepeat(false);
   button.enableLongPress(true);
+  pinMode(V1, OUTPUT);
+  pinMode(V2, OUTPUT);
+  pinMode(V3, OUTPUT);
+  pinMode(V4, OUTPUT);
+  pinMode(V5, OUTPUT);
+  pinMode(V6, OUTPUT);
 }
 
 void loop() {
