@@ -43,7 +43,7 @@ uint16_t readVcc() {
   long result = (high << 8) | low;
 
   result = 1387069L / result;  // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
-  return (uint16_t)result;          // Vcc in millivolts
+  return (uint16_t)result;     // Vcc in millivolts
 }
 
 void show(const char *s, const GFXfont *f = &FreeSansBold12pt7b) {
@@ -74,7 +74,7 @@ void updateDisplay(uint8_t val, uint16_t vcc) {
   disp.setCursor((128 - w) / 2, 18);
   disp.print(s);
 
-  w=constrain(map(vcc,MIN_VCC,MAX_VCC,0,128),0,128);
+  w = constrain(map(vcc, MIN_VCC, MAX_VCC, 0, 128), 0, 128);
   disp.drawRect(0, 24, 128, 8, WHITE);
   disp.fillRect(0, 24, w, 8, WHITE);
 
@@ -91,17 +91,17 @@ void updatePins(uint8_t val) {
 }
 
 void checkBattery() {
-  if ((vcc = readVcc()) < MIN_VCC)
+  if ((vcc = readVcc()) < MIN_VCC) {
+    powerOff();
     while (true)
       LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
+  }
 }
 
 void powerOff() {
   showOff();
   while (digitalRead(BUTTON) == LOW)
     ;
-  delay(300);
-  delay(600);
   disp.clearDisplay();
   disp.display();
   disp.ssd1306_command(SSD1306_DISPLAYOFF);
@@ -170,7 +170,7 @@ void loop() {
     tLastInput = millis();
     Serial.println(val);
     oldVal = val;
-    updateDisplay(val,vcc);
+    updateDisplay(val, vcc);
     updatePins(val);
   }
 }
